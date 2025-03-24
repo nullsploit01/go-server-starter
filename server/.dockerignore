@@ -1,0 +1,8 @@
+tmp/
+
+.air*
+main
+Makefile
+*.md
+*DS_Store
+*.html
