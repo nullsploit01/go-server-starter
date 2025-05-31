@@ -3,15 +3,12 @@ package response
 import (
 	"encoding/json"
 	"net/http"
+
+	m "github.com/nullsploit01/server/models"
 )
 
-type ResponseBody struct {
-	Error bool `json:"error"`
-	Data  any  `json:"data" validate:"omitempty"`
-}
-
-func JSON(w http.ResponseWriter, status int, data any) error {
-	response := ResponseBody{
+func JSON[T any](w http.ResponseWriter, status int, data T) error {
+	response := m.ResponseBody[T]{
 		Error: false,
 		Data:  data,
 	}

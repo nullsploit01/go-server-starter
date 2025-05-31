@@ -1,14 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"strings"
 
+	"github.com/nullsploit01/server/internal/customError"
 	"github.com/nullsploit01/server/internal/response"
 	"github.com/nullsploit01/server/internal/validator"
+	"github.com/nullsploit01/server/models"
 )
 
 func (app *application) ReportServerError(r *http.Request, err error) {
@@ -26,7 +29,7 @@ func (app *application) ReportServerError(r *http.Request, err error) {
 func (app *application) ErrorMessage(w http.ResponseWriter, r *http.Request, status int, message string, headers http.Header) {
 	message = strings.ToUpper(message[:1]) + message[1:]
 
-	responseBody := response.ResponseBody{
+	responseBody := models.ResponseBody[string]{
 		Error: true,
 		Data:  message,
 	}
@@ -59,11 +62,45 @@ func (app *application) BadRequest(w http.ResponseWriter, r *http.Request, err e
 	app.ErrorMessage(w, r, http.StatusBadRequest, err.Error(), nil)
 }
 
+func (app *application) Forbidden(w http.ResponseWriter, r *http.Request, err error) {
+	app.ErrorMessage(w, r, http.StatusForbidden, err.Error(), nil)
+}
+
 func (app *application) FailedValidation(w http.ResponseWriter, r *http.Request, v validator.Validator) {
 	err := response.JSON(w, http.StatusUnprocessableEntity, v)
 	if err != nil {
 		app.ServerError(w, r, err)
 	}
+}
+
+func (app *application) HandleError(w http.ResponseWriter, r *http.Request, err error) {
+	var we customError.WrongCredentialsError
+	var ve customError.ValidationError
+	var fe customError.ForbiddenError
+	var ne customError.NotFoundError
+
+	if errors.As(err, &we) || errors.As(err, &ve) {
+		app.BadRequest(w, r, err)
+		return
+	}
+
+	if errors.As(err, &fe) {
+		app.Forbidden(w, r, err)
+		return
+	}
+
+	if errors.As(err, &ne) {
+		app.NotFound(w, r)
+		return
+	}
+
+	if err.Error() == "no rows in result set" {
+		app.NotFound(w, r)
+		return
+	}
+
+	app.ReportServerError(r, err)
+	app.ServerError(w, r, err)
 }
 
 func (app *application) BasicAuthenticationRequired(w http.ResponseWriter, r *http.Request) {
